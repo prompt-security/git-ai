@@ -10,6 +10,8 @@ use crate::git::refs::{CommitAuthorship, get_commits_with_notes_from_list};
 use crate::git::repository::{CommitRange, Repository};
 use crate::utils::debug_log;
 
+use std::io::IsTerminal;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RangeAuthorshipStats {
     pub authorship_stats: RangeAuthorshipStatsData,
@@ -361,7 +363,10 @@ pub fn print_range_authorship_stats(stats: &RangeAuthorshipStats) {
 
     // Use existing stats terminal output
     use crate::authorship::stats::write_stats_to_terminal;
-    write_stats_to_terminal(&stats.range_stats, true);
+
+    // Only print stats if we're in an interactive terminal
+    let is_interactive = std::io::stdout().is_terminal();
+    write_stats_to_terminal(&stats.range_stats, is_interactive);
 
     // Check if all individual commits have authorship logs (for optional breakdown)
     let all_have_authorship =

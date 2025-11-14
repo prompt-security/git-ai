@@ -6,6 +6,7 @@ use crate::commands::checkpoint_agent::agent_presets::{CursorPreset, GithubCopil
 use crate::error::GitAiError;
 use crate::git::refs::notes_add;
 use crate::git::repository::Repository;
+use std::io::IsTerminal;
 use std::collections::{HashMap, HashSet};
 
 pub fn post_commit(
@@ -87,9 +88,10 @@ pub fn post_commit(
     // }
 
     if !supress_output {
-        let refname = repo.head()?.name().unwrap().to_string();
         let stats = stats_for_commit_stats(repo, &commit_sha)?;
-        write_stats_to_terminal(&stats, true);
+        // Only print stats if we're in an interactive terminal
+        let is_interactive = std::io::stdout().is_terminal();
+        write_stats_to_terminal(&stats, is_interactive);
     }
     Ok((commit_sha.to_string(), authorship_log))
 }
