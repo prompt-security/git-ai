@@ -18,6 +18,18 @@ pub struct WorkingLogEntry {
     pub attributions: Vec<Attribution>,
     #[serde(default)]
     pub line_attributions: Vec<LineAttribution>,
+    /// Line statistics for this file (additions/deletions)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line_stats: Option<FileLineStats>,
+}
+
+/// Per-file line statistics
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct FileLineStats {
+    pub additions: u32,
+    pub deletions: u32,
+    pub additions_sloc: u32,
+    pub deletions_sloc: u32,
 }
 
 impl WorkingLogEntry {
@@ -33,6 +45,24 @@ impl WorkingLogEntry {
             blob_sha,
             attributions,
             line_attributions,
+            line_stats: None,
+        }
+    }
+
+    /// Create a new working log entry with line stats
+    pub fn new_with_line_stats(
+        file: String,
+        blob_sha: String,
+        attributions: Vec<Attribution>,
+        line_attributions: Vec<LineAttribution>,
+        line_stats: FileLineStats,
+    ) -> Self {
+        Self {
+            file,
+            blob_sha,
+            attributions,
+            line_attributions,
+            line_stats: Some(line_stats),
         }
     }
 }
