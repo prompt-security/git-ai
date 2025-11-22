@@ -94,6 +94,11 @@ fn inject_authorship_refspec(
         return None;
     }
 
+    // Check if authorship refspec is already present
+    if args.iter().any(|a| a == AUTHORSHIP_REFSPEC) {
+        return None;
+    }
+
     let mut new_args = Vec::new();
     let mut double_dash_index: Option<usize> = None;
     let mut found_remote_explicitly = false;
@@ -149,16 +154,16 @@ fn inject_authorship_refspec(
         // Always append our refspec at the end when -- is present
         new_args.push(AUTHORSHIP_REFSPEC.to_string());
     } else if !found_refspec {
-        // Case 1: No explicit refspecs and no --, need to add -- separator and remote if not present
+        // No explicit refspecs - inject HEAD to push current branch + our notes
+        // git push -> git push origin HEAD refs/notes/ai:refs/notes/ai
+        // git push origin -> git push origin HEAD refs/notes/ai:refs/notes/ai
         if !found_remote_explicitly {
-            // git push -> git push {remote} -- refs/notes/ai:refs/notes/ai
             new_args.push(remote.to_string());
         }
-        // git push origin -> git push origin -- refs/notes/ai:refs/notes/ai
-        new_args.push("--".to_string());
+        new_args.push("HEAD".to_string());
         new_args.push(AUTHORSHIP_REFSPEC.to_string());
     } else {
-        // Case 2: Has refspecs without --, just append ours at the end
+        // Has explicit refspecs without --, just append ours at the end
         // git push origin main -> git push origin main refs/notes/ai:refs/notes/ai
         new_args.push(AUTHORSHIP_REFSPEC.to_string());
     }
@@ -232,23 +237,23 @@ mod tests {
 
     #[test]
     fn test_inject_no_remote_no_refspec() {
-        // git push -> git push origin -- refs/notes/ai:refs/notes/ai
+        // git push -> git push origin HEAD refs/notes/ai:refs/notes/ai
         let args = args_vec(&[]);
         let result = inject_authorship_refspec(&args, "origin", &["origin".to_string()]);
         assert_eq!(
             result,
-            Some(args_vec(&["origin", "--", "refs/notes/ai:refs/notes/ai"]))
+            Some(args_vec(&["origin", "HEAD", "refs/notes/ai:refs/notes/ai"]))
         );
     }
 
     #[test]
     fn test_inject_with_remote_no_refspec() {
-        // git push origin -> git push origin -- refs/notes/ai:refs/notes/ai
+        // git push origin -> git push origin HEAD refs/notes/ai:refs/notes/ai
         let args = args_vec(&["origin"]);
         let result = inject_authorship_refspec(&args, "origin", &["origin".to_string()]);
         assert_eq!(
             result,
-            Some(args_vec(&["origin", "--", "refs/notes/ai:refs/notes/ai"]))
+            Some(args_vec(&["origin", "HEAD", "refs/notes/ai:refs/notes/ai"]))
         );
     }
 
@@ -484,5 +489,13 @@ mod tests {
         assert!(result.is_some());
         let result_args = result.unwrap();
         assert!(result_args.contains(&"refs/notes/ai:refs/notes/ai".to_string()));
+    }
+
+    #[test]
+    fn test_skip_if_authorship_refspec_already_present() {
+        // git push origin HEAD refs/notes/ai:refs/notes/ai -> should return None (already has it)
+        let args = args_vec(&["origin", "HEAD", "refs/notes/ai:refs/notes/ai"]);
+        let result = inject_authorship_refspec(&args, "origin", &["origin".to_string()]);
+        assert_eq!(result, None);
     }
 }
