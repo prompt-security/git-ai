@@ -718,3 +718,232 @@ fn test_stash_pop_onto_head_with_ai_changes() {
         "Expected file1.txt in authorship log"
     );
 }
+
+#[test]
+fn test_stash_pop_across_branches() {
+    // Test that AI attributions are preserved when stashing, switching branches, and popping
+    let repo = TestRepo::new();
+
+    // Create initial commit on main branch
+    let mut readme = repo.filename("README.md");
+    readme.set_contents(vec!["# Test Repo".to_string()]);
+    repo.stage_all_and_commit("initial commit")
+        .expect("commit should succeed");
+
+    // Create a file with existing human content
+    let mut example = repo.filename("example.txt");
+    example.set_contents(vec!["line 1".human(), "line 2".human(), "line 3".human()]);
+    repo.stage_all_and_commit("add example file")
+        .expect("commit should succeed");
+
+    // Add 5 AI-generated lines at the bottom
+    example.set_contents(vec![
+        "line 1".human(),
+        "line 2".human(),
+        "line 3".human(),
+        "AI line 1".ai(),
+        "AI line 2".ai(),
+        "AI line 3".ai(),
+        "AI line 4".ai(),
+        "AI line 5".ai(),
+    ]);
+    repo.git_ai(&["checkpoint", "mock_ai"])
+        .expect("checkpoint should succeed");
+
+    // Stash the AI changes
+    repo.git(&["stash"]).expect("stash should succeed");
+
+    // Verify file reverted to 3 lines
+    let content = repo.read_file("example.txt").expect("file should exist");
+    assert_eq!(
+        content.lines().count(),
+        3,
+        "Should have reverted to 3 lines"
+    );
+
+    // Create and checkout a new branch
+    repo.git(&["checkout", "-b", "feature-branch"])
+        .expect("should create and checkout new branch");
+
+    // Pop the stash on the new branch
+    repo.git(&["stash", "pop"])
+        .expect("stash pop should succeed");
+
+    // Commit the changes on the new branch
+    let commit = repo
+        .stage_all_and_commit("apply AI changes on feature branch")
+        .expect("commit should succeed");
+
+    // Verify all AI attributions are preserved
+    example.assert_lines_and_blame(vec![
+        "line 1".human(),
+        "line 2".human(),
+        "line 3".human(),
+        "AI line 1".ai(),
+        "AI line 2".ai(),
+        "AI line 3".ai(),
+        "AI line 4".ai(),
+        "AI line 5".ai(),
+    ]);
+
+    // Should have AI prompts in authorship log
+    assert!(
+        !commit.authorship_log.metadata.prompts.is_empty(),
+        "Expected AI prompts in authorship log"
+    );
+}
+
+#[test]
+fn test_stash_pop_across_branches_with_conflict() {
+    // Test that AI attributions are preserved when resolving conflicts after stash pop across branches
+    let repo = TestRepo::new();
+
+    // Create initial commit on main branch
+    let mut readme = repo.filename("README.md");
+    readme.set_contents(vec!["# Test Repo".to_string()]);
+    repo.stage_all_and_commit("initial commit")
+        .expect("commit should succeed");
+
+    // Create a file with existing content
+    let mut example = repo.filename("example.txt");
+    example.set_contents(vec!["line 1".human(), "line 2".human(), "line 3".human()]);
+    repo.stage_all_and_commit("add example file")
+        .expect("commit should succeed");
+
+    // Add 5 AI-generated lines at the bottom
+    example.set_contents(vec![
+        "line 1".human(),
+        "line 2".human(),
+        "line 3".human(),
+        "AI line 1".ai(),
+        "AI line 2".ai(),
+        "AI line 3".ai(),
+        "AI line 4".ai(),
+        "AI line 5".ai(),
+    ]);
+    repo.git_ai(&["checkpoint", "mock_ai"])
+        .expect("checkpoint should succeed");
+
+    // Stash the AI changes
+    repo.git(&["stash"]).expect("stash should succeed");
+
+    // Create and checkout a new branch
+    repo.git(&["checkout", "-b", "feature-branch"])
+        .expect("should create and checkout new branch");
+
+    // Make conflicting changes on the new branch (add different content at the bottom)
+    example.set_contents(vec![
+        "line 1".human(),
+        "line 2".human(),
+        "line 3".human(),
+        "feature line 1".ai(),
+        "feature line 2".ai(),
+    ]);
+    repo.git_ai(&["checkpoint", "mock_ai"])
+        .expect("checkpoint should succeed");
+    repo.stage_all_and_commit("add feature content")
+        .expect("commit should succeed");
+
+    // Try to pop the stash - this will create a conflict
+    let _result = repo.git(&["stash", "pop"]);
+
+    // Verify there's a conflict
+    let content = repo.read_file("example.txt").expect("file should exist");
+    assert!(
+        content.contains("<<<<<<<") || content.contains(">>>>>>>"),
+        "Expected conflict markers in file"
+    );
+
+    // Resolve the conflict by keeping both (feature branch lines + stashed AI lines)
+    example.set_contents(vec![
+        "line 1".human(),
+        "line 2".human(),
+        "line 3".human(),
+        "feature line 1".ai(),
+        "feature line 2".ai(),
+        "AI line 1".ai(),
+        "AI line 2".ai(),
+        "AI line 3".ai(),
+        "AI line 4".ai(),
+        "AI line 5".ai(),
+    ]);
+
+    // Mark as resolved and commit
+    repo.git(&["add", "example.txt"])
+        .expect("should be able to add resolved file");
+
+    let commit = repo
+        .stage_all_and_commit("resolved conflict keeping both changes")
+        .expect("commit should succeed");
+
+    // Verify all AI attributions are preserved for both sets of changes
+    example.assert_lines_and_blame(vec![
+        "line 1".human(),
+        "line 2".human(),
+        "line 3".human(),
+        "feature line 1".ai(),
+        "feature line 2".ai(),
+        "AI line 1".ai(),
+        "AI line 2".ai(),
+        "AI line 3".ai(),
+        "AI line 4".ai(),
+        "AI line 5".ai(),
+    ]);
+
+    // Should have AI prompts in authorship log
+    assert!(
+        !commit.authorship_log.metadata.prompts.is_empty(),
+        "Expected AI prompts in authorship log"
+    );
+}
+
+#[test]
+fn test_stash_apply_reset_apply_again() {
+    // Test that AI attributions survive multiple apply/reset cycles
+    let repo = TestRepo::new();
+
+    // Create initial commit
+    let mut readme = repo.filename("README.md");
+    readme.set_contents(vec!["# Test Repo".to_string()]);
+    repo.stage_all_and_commit("initial commit")
+        .expect("commit should succeed");
+
+    // Create a file with AI content
+    let mut example = repo.filename("example.txt");
+    example.set_contents(vec!["AI line 1".ai(), "AI line 2".ai(), "AI line 3".ai()]);
+    repo.git_ai(&["checkpoint", "mock_ai"])
+        .expect("checkpoint should succeed");
+
+    // Stash the changes (using regular stash, not apply, so we can test the workflow)
+    repo.git(&["stash"]).expect("stash should succeed");
+    assert!(repo.read_file("example.txt").is_none());
+
+    // Apply the stash (NOT pop, so it stays in the stash list)
+    repo.git(&["stash", "apply", "stash@{0}"])
+        .expect("stash apply should succeed");
+    assert!(repo.read_file("example.txt").is_some());
+
+    // Reset to undo the apply
+    repo.git(&["reset", "--hard"])
+        .expect("reset should succeed");
+    assert!(repo.read_file("example.txt").is_none());
+
+    // Apply the same stash again
+    repo.git(&["stash", "apply", "stash@{0}"])
+        .expect("second stash apply should succeed");
+    assert!(repo.read_file("example.txt").is_some());
+
+    // Commit the changes
+    let commit = repo
+        .stage_all_and_commit("apply stash after reset")
+        .expect("commit should succeed");
+
+    // Verify AI attribution is preserved after multiple apply/reset cycles
+    example.assert_lines_and_blame(vec!["AI line 1".ai(), "AI line 2".ai(), "AI line 3".ai()]);
+
+    // Check authorship log has AI prompts
+    assert!(
+        !commit.authorship_log.metadata.prompts.is_empty(),
+        "Expected AI prompts in authorship log after multiple apply/reset cycles"
+    );
+}

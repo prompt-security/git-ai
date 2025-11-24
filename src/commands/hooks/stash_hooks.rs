@@ -1,4 +1,5 @@
 use crate::authorship::virtual_attribution::VirtualAttributions;
+use crate::authorship::working_log::CheckpointKind;
 use crate::commands::git_handlers::CommandHooksContext;
 use crate::commands::hooks::commit_hooks::get_commit_default_author;
 use crate::error::GitAiError;
@@ -27,6 +28,23 @@ pub fn pre_stash_hook(
             command_hooks_context.stash_sha = Some(stash_sha);
             debug_log(&format!("Pre-stash: captured stash SHA for {}", subcommand));
         }
+    } else {
+        let _ = match crate::commands::checkpoint::run(
+            repository,
+            &get_commit_default_author(repository, &parsed_args.command_args),
+            CheckpointKind::Human,
+            false,
+            false,
+            true,
+            None,
+            true, // same optimizations as pre_commit.rs
+        ) {
+            Ok(result) => result,
+            Err(e) => {
+                debug_log(&format!("Failed to run checkpoint: {}", e));
+                return;
+            }
+        };
     }
 }
 
