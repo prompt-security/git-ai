@@ -77,6 +77,7 @@ pub struct CommandHooksContext {
     pub _rebase_onto: Option<String>,
     pub fetch_authorship_handle: Option<std::thread::JoinHandle<()>>,
     pub stash_sha: Option<String>,
+    pub push_authorship_handle: Option<std::thread::JoinHandle<()>>,
 }
 
 pub fn handle_git(args: &[String]) {
@@ -123,6 +124,7 @@ pub fn handle_git(args: &[String]) {
             _rebase_onto: None,
             fetch_authorship_handle: None,
             stash_sha: None,
+            push_authorship_handle: None,
         };
 
         let repository = repository_option.as_mut().unwrap();
@@ -186,7 +188,8 @@ fn run_pre_command_hooks(
                 );
             }
             Some("push") => {
-                push_hooks::push_pre_command_hook(parsed_args, repository);
+                command_hooks_context.push_authorship_handle =
+                    push_hooks::push_pre_command_hook(parsed_args, repository);
             }
             Some("fetch") | Some("pull") => {
                 command_hooks_context.fetch_authorship_handle =
@@ -240,6 +243,12 @@ fn run_post_command_hooks(
                 command_hooks_context,
             ),
             Some("fetch") | Some("pull") => fetch_hooks::fetch_pull_post_command_hook(
+                repository,
+                parsed_args,
+                exit_status,
+                command_hooks_context,
+            ),
+            Some("push") => push_hooks::push_post_command_hook(
                 repository,
                 parsed_args,
                 exit_status,

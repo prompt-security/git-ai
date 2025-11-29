@@ -236,6 +236,7 @@ pub fn push_authorship_notes(repository: &Repository, remote_name: &str) -> Resu
     push_authorship.push("--quiet".to_string());
     push_authorship.push("--no-recurse-submodules".to_string());
     push_authorship.push("--no-verify".to_string());
+    push_authorship.push("--no-signed".to_string());
     push_authorship.push(remote_name.to_string());
     push_authorship.push(AI_AUTHORSHIP_PUSH_REFSPEC.to_string());
 
