@@ -24,6 +24,11 @@ dirs = "5.0"
 minreq = { version = "2.12", features = ["https-rustls"] }
 url = "2.5"
 glob = "0.3"
+gix-discover = "0.38"
+gix-odb = "0.67"
+gix-object = "0.47"
+gix-ref = "0.50"
+gix-hash = "0.16"
 
 [features]
 test-support = ["git2"]

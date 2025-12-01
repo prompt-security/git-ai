@@ -3,6 +3,8 @@ pub mod diff_tree_to_tree;
 pub mod refs;
 pub mod repository;
 
+pub mod authorship_traversal;
+
 #[allow(unused_imports)]
 pub use repository::{find_repository, find_repository_in_path, from_bare_repository};
 pub mod repo_storage;
