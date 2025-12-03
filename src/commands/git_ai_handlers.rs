@@ -66,6 +66,9 @@ pub fn handle_git_ai(args: &[String]) {
         "blame" => {
             handle_ai_blame(&args[1..]);
         }
+        "diff" => {
+            handle_ai_diff(&args[1..]);
+        }
         "git-path" => {
             let config = config::Config::get();
             println!("{}", config.git_cmd());
@@ -114,6 +117,9 @@ fn print_help() {
     eprintln!("    --reset                     Reset working log");
     eprintln!("    mock_ai [pathspecs...]      Test preset accepting optional file pathspecs");
     eprintln!("  blame <file>       Git blame with AI authorship overlay");
+    eprintln!("  diff <commit|range>  Show diff with AI authorship annotations");
+    eprintln!("    <commit>              Diff from commit's parent to commit");
+    eprintln!("    <commit1>..<commit2>  Diff between two commits");
     eprintln!("  stats [commit]     Show AI authorship statistics for a commit");
     eprintln!("    --json                 Output in JSON format");
     eprintln!("  show <rev|range>   Display authorship logs for a revision or range");
@@ -441,6 +447,21 @@ fn handle_ai_blame(args: &[String]) {
 
     if let Err(e) = repo.blame(&file_path, &options) {
         eprintln!("Blame failed: {}", e);
+        std::process::exit(1);
+    }
+}
+
+fn handle_ai_diff(args: &[String]) {
+    let repo = match find_repository(&Vec::<String>::new()) {
+        Ok(repo) => repo,
+        Err(e) => {
+            eprintln!("Failed to find repository: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    if let Err(e) = commands::diff::handle_diff(&repo, args) {
+        eprintln!("Diff failed: {}", e);
         std::process::exit(1);
     }
 }
