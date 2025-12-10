@@ -2,6 +2,8 @@ name: Release Build
 
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 
 on:
   workflow_dispatch:
@@ -282,6 +284,37 @@ jobs:
             touch SHA256SUMS
           fi
 
+      - name: Checkout code for install script
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: Generate version-pinned install script
+        run: |
+          VERSION="${{ steps.release-meta.outputs.tag_name }}"
+          # Convert checksums to pipe-separated format for embedding
+          CHECKSUMS=$(tr '\n' '|' < release/SHA256SUMS | sed 's/|$//')
+          if [ -z "$CHECKSUMS" ]; then
+            CHECKSUMS="__CHECKSUMS_PLACEHOLDER__"
+          fi
+          # Replace only the variable assignment lines (line 17 and 22) to preserve comparison strings
+          awk -v version="$VERSION" -v checksums="$CHECKSUMS" '
+            NR==17 { sub(/__VERSION_PLACEHOLDER__/, version) }
+            NR==22 { sub(/__CHECKSUMS_PLACEHOLDER__/, checksums) }
+            { print }
+          ' repo/install.sh > release/install.sh
+          chmod +x release/install.sh
+          echo "Generated version-pinned install.sh for $VERSION"
+          echo "Embedded checksums: $CHECKSUMS"
+
+      - name: Generate attestations for release artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            release/git-ai-*
+            release/install.sh
+            release/SHA256SUMS
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -293,6 +326,12 @@ jobs:
             ### Release Channel
             `${{ steps.release-meta.outputs.channel_label }}`
 
+            ### Installation
+            Install this specific version with checksum verification:
+            ```bash
+            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ steps.release-meta.outputs.tag_name }}/install.sh | bash
+            ```
+
             ### Downloads
             - **Linux (x64)**: `git-ai-linux-x64`
             - **Linux (ARM64)**: `git-ai-linux-arm64`
@@ -300,19 +339,20 @@ jobs:
             - **macOS (Intel)**: `git-ai-macos-x64`
             - **macOS (Apple Silicon)**: `git-ai-macos-arm64`
 
-            ### Installation
-            Download the appropriate binary for your platform and make it executable:
-            ```bash
-            chmod +x git-ai-<platform>
-            ```
-
             ### SHA256 Checksums
             ```
             $(cat release/SHA256SUMS)
             ```
+
+            ### Attestation Verification
+            Verify build provenance with the GitHub CLI:
+            ```bash
+            gh attestation verify git-ai-<platform> --repo ${{ github.repository }}
+            ```
           files: |
             release/git-ai-*
             release/SHA256SUMS
+            release/install.sh
           draft: false
           prerelease: ${{ steps.release-meta.outputs.prerelease == 'true' }}
           make_latest: ${{ steps.release-meta.outputs.make_latest }}

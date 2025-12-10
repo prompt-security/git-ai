@@ -12,6 +12,15 @@ NC='\033[0m' # No Color
 # GitHub repository details
 REPO="acunniffe/git-ai"
 
+# Version placeholder - replaced during release builds with actual version (e.g., "v1.0.24")
+# When set to __VERSION_PLACEHOLDER__, defaults to "latest"
+PINNED_VERSION="__VERSION_PLACEHOLDER__"
+
+# Embedded checksums - replaced during release builds with actual SHA256 checksums
+# Format: "hash  filename|hash  filename|..." (pipe-separated)
+# When set to __CHECKSUMS_PLACEHOLDER__, checksum verification is skipped
+EMBEDDED_CHECKSUMS="__CHECKSUMS_PLACEHOLDER__"
+
 # Function to print error messages
 error() {
     echo -e "${RED}Error: $1${NC}" >&2
@@ -25,6 +34,51 @@ warn() {
 # Function to print success messages
 success() {
     echo -e "${GREEN}$1${NC}"
+}
+
+# Function to verify checksum of downloaded binary
+verify_checksum() {
+    local file="$1"
+    local binary_name="$2"
+
+    # Skip verification if no checksums are embedded
+    if [ "$EMBEDDED_CHECKSUMS" = "__CHECKSUMS_PLACEHOLDER__" ]; then
+        return 0
+    fi
+
+    # Extract expected checksum for this binary
+    local expected=""
+    local old_ifs="$IFS"
+    IFS='|' read -ra CHECKSUM_ENTRIES <<< "$EMBEDDED_CHECKSUMS"
+    IFS="$old_ifs"
+    for entry in "${CHECKSUM_ENTRIES[@]}"; do
+        if [[ "$entry" =~ ^[[:xdigit:]]+[[:space:]]+$binary_name$ ]]; then
+            expected=$(echo "$entry" | awk '{print $1}')
+            break
+        fi
+    done
+
+    if [ -z "$expected" ]; then
+        error "No checksum found for $binary_name"
+    fi
+
+    # Calculate actual checksum
+    local actual=""
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$file" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$file" | awk '{print $1}')
+    else
+        warn "Neither sha256sum nor shasum available, skipping checksum verification"
+        return 0
+    fi
+
+    if [ "$expected" != "$actual" ]; then
+        rm -f "$file" 2>/dev/null || true
+        error "Checksum verification failed for $binary_name\nExpected: $expected\nActual:   $actual"
+    fi
+
+    success "Checksum verified for $binary_name"
 }
 
 # Function to detect shell and generate alias command
@@ -144,13 +198,20 @@ esac
 # Determine binary name
 BINARY_NAME="git-ai-${OS}-${ARCH}"
 
-# Determine release tag (defaults to latest but can be overridden)
-RELEASE_TAG="${GIT_AI_RELEASE_TAG:-latest}"
-if [ -n "$RELEASE_TAG" ] && [ "$RELEASE_TAG" != "latest" ]; then
+# Determine release tag
+# Priority: 1. Pinned version (for release builds), 2. Environment variable, 3. "latest"
+if [ "$PINNED_VERSION" != "__VERSION_PLACEHOLDER__" ]; then
+    # Version-pinned install script from a release
+    RELEASE_TAG="$PINNED_VERSION"
+    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${RELEASE_TAG}/${BINARY_NAME}"
+elif [ -n "${GIT_AI_RELEASE_TAG:-}" ] && [ "${GIT_AI_RELEASE_TAG:-}" != "latest" ]; then
+    # Environment variable override
+    RELEASE_TAG="$GIT_AI_RELEASE_TAG"
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${RELEASE_TAG}/${BINARY_NAME}"
 else
-    DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY_NAME}"
+    # Default to latest
     RELEASE_TAG="latest"
+    DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY_NAME}"
 fi
 
 # Install into the user's bin directory ~/.git-ai/bin
@@ -172,6 +233,9 @@ if [ ! -s "$TMP_FILE" ]; then
     rm -f "$TMP_FILE" 2>/dev/null || true
     error "Downloaded file is empty"
 fi
+
+# Verify checksum if embedded (release builds only)
+verify_checksum "$TMP_FILE" "$BINARY_NAME"
 
 mv -f "$TMP_FILE" "${INSTALL_DIR}/git-ai"
 
