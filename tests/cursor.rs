@@ -466,6 +466,7 @@ fn test_cursor_e2e_with_resync() {
         .commit_with_env(
             "Add cursor edits",
             &[("GIT_AI_CURSOR_GLOBAL_DB_PATH", &temp_db_path_str)],
+            None,
         )
         .unwrap();
 

@@ -1799,14 +1799,17 @@ pub fn find_repository(global_args: &Vec<String>) -> Result<Repository, GitAiErr
         )));
     }
 
-    // Rewrite global_args if -C path doesn't match the actual workdir/
-    // So every git command can assume it's being run in repo root
+    // Ensure all internal git commands use the repository root consistently
+    // When running from a subdirectory without -C, add it to ensure hooks work correctly
     let mut global_args = global_args.clone();
-    if global_args.len() == 2 && global_args[0] == "-C" {
-        let workdir_str = workdir.display().to_string();
-        if global_args[1] != workdir_str {
-            global_args[1] = workdir_str;
-        }
+    let workdir_str = workdir.display().to_string();
+
+    if global_args.is_empty() {
+        // Add -C flag when not present (e.g., when running from subdirectory)
+        global_args = vec!["-C".to_string(), workdir_str];
+    } else if global_args.len() == 2 && global_args[0] == "-C" && global_args[1] != workdir_str {
+        // Rewrite existing -C to repo root if it points elsewhere
+        global_args[1] = workdir_str;
     }
 
     // Canonicalize workdir for reliable path comparisons (especially on Windows)

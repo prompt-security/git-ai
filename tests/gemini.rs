@@ -808,6 +808,7 @@ fn test_gemini_e2e_with_resync() {
         .commit_with_env(
             "Add gemini edits",
             &[("GIT_AI_GEMINI_SESSION_PATH", &temp_session_path_str)],
+            None,
         )
         .unwrap();
 

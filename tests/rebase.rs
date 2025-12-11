@@ -248,6 +248,7 @@ fn test_rebase_interactive_reorder() {
     let result = repo.git_with_env(
         &["rebase", "-i", &base_commit],
         &[("GIT_SEQUENCE_EDITOR", "true"), ("GIT_EDITOR", "true")],
+        None,
     );
 
     if result.is_err() {
@@ -382,7 +383,7 @@ fn test_rebase_rerere() {
 
     repo.git(&["add", "conflict.txt"]).unwrap();
 
-    repo.git_with_env(&["rebase", "--continue"], &[("GIT_EDITOR", "true")])
+    repo.git_with_env(&["rebase", "--continue"], &[("GIT_EDITOR", "true")], None)
         .unwrap();
 
     // Record the resolution and abort
@@ -395,7 +396,7 @@ fn test_rebase_rerere() {
     // This test mainly verifies that rerere doesn't break authorship tracking
     if rebase_result.is_err() {
         repo.git(&["add", "conflict.txt"]).unwrap();
-        repo.git_with_env(&["rebase", "--continue"], &[("GIT_EDITOR", "true")])
+        repo.git_with_env(&["rebase", "--continue"], &[("GIT_EDITOR", "true")], None)
             .unwrap();
     }
 
@@ -657,6 +658,7 @@ fn test_rebase_autosquash() {
     let rebase_result = repo.git_with_env(
         &["rebase", "-i", "--autosquash", &base],
         &[("GIT_SEQUENCE_EDITOR", "true"), ("GIT_EDITOR", "true")],
+        None,
     );
 
     if rebase_result.is_ok() {
@@ -749,6 +751,7 @@ fn test_rebase_exec() {
     repo.git_with_env(
         &["rebase", "-i", "--exec", "echo 'test passed'", &base],
         &[("GIT_SEQUENCE_EDITOR", "true"), ("GIT_EDITOR", "true")],
+        None,
     )
     .expect("Rebase with --exec should succeed");
 
@@ -918,6 +921,7 @@ sed -i.bak '3s/pick/squash/' "$1"
             ("GIT_SEQUENCE_EDITOR", script_path.to_str().unwrap()),
             ("GIT_EDITOR", "true"),
         ],
+        None,
     );
 
     if rebase_result.is_err() {
@@ -1050,6 +1054,7 @@ cat {} > "$1"
             ("GIT_SEQUENCE_EDITOR", script_path.to_str().unwrap()),
             ("GIT_EDITOR", editor_script_path.to_str().unwrap()),
         ],
+        None,
     );
 
     if rebase_result.is_err() {

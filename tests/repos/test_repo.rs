@@ -20,7 +20,7 @@ use super::test_file::TestFile;
 pub struct TestRepo {
     path: PathBuf,
     pub feature_flags: FeatureFlags,
-    config_patch: Option<ConfigPatch>,
+    pub(crate) config_patch: Option<ConfigPatch>,
 }
 
 impl TestRepo {
@@ -115,7 +115,18 @@ impl TestRepo {
     }
 
     pub fn git(&self, args: &[&str]) -> Result<String, String> {
-        return self.git_with_env(args, &[]);
+        return self.git_with_env(args, &[], None);
+    }
+
+    /// Run a git command from a working directory (without using -C flag)
+    /// This tests that git-ai correctly finds the repository root when run from a subdirectory
+    /// The working_dir will be canonicalized to ensure it's an absolute path
+    pub fn git_from_working_dir(
+        &self,
+        working_dir: &std::path::Path,
+        args: &[&str],
+    ) -> Result<String, String> {
+        self.git_with_env(args, &[], Some(working_dir))
     }
 
     pub fn git_og(&self, args: &[&str]) -> Result<String, String> {
@@ -139,7 +150,7 @@ impl TestRepo {
     }
 
     pub fn benchmark_git(&self, args: &[&str]) -> Result<BenchmarkResult, String> {
-        let output = self.git_with_env(args, &[("GIT_AI_DEBUG_PERFORMANCE", "2")])?;
+        let output = self.git_with_env(args, &[("GIT_AI_DEBUG_PERFORMANCE", "2")], None)?;
 
         println!("output: {}", output);
         Self::parse_benchmark_result(&output)
@@ -183,14 +194,35 @@ impl TestRepo {
         Err("No performance data found in output".to_string())
     }
 
-    pub fn git_with_env(&self, args: &[&str], envs: &[(&str, &str)]) -> Result<String, String> {
+    pub fn git_with_env(
+        &self,
+        args: &[&str],
+        envs: &[(&str, &str)],
+        working_dir: Option<&std::path::Path>,
+    ) -> Result<String, String> {
         let binary_path = get_binary_path();
 
-        let mut full_args = vec!["-C", self.path.to_str().unwrap()];
-        full_args.extend(args);
-
         let mut command = Command::new(binary_path);
-        command.args(&full_args).env("GIT_AI", "git");
+        
+        // If working_dir is provided, use current_dir instead of -C flag
+        // This tests that git-ai correctly finds the repository root when run from a subdirectory
+        // The working_dir will be canonicalized to ensure it's an absolute path
+        if let Some(working_dir_path) = working_dir {
+            // Canonicalize to ensure we have an absolute path
+            let absolute_working_dir = working_dir_path.canonicalize()
+                .map_err(|e| format!(
+                    "Failed to canonicalize working directory {}: {}",
+                    working_dir_path.display(),
+                    e
+                ))?;
+            command.args(args).current_dir(&absolute_working_dir);
+        } else {
+            let mut full_args = vec!["-C", self.path.to_str().unwrap()];
+            full_args.extend(args);
+            command.args(&full_args);
+        }
+        
+        command.env("GIT_AI", "git");
 
         // Add config patch as environment variable if present
         if let Some(patch) = &self.config_patch {
@@ -295,7 +327,18 @@ impl TestRepo {
     }
 
     pub fn commit(&self, message: &str) -> Result<NewCommit, String> {
-        return self.commit_with_env(message, &[]);
+        return self.commit_with_env(message, &[], None);
+    }
+
+    /// Commit from a working directory (without using -C flag)
+    /// This tests that git-ai correctly handles commits when run from a subdirectory
+    /// The working_dir will be canonicalized to ensure it's an absolute path
+    pub fn commit_from_working_dir(
+        &self,
+        working_dir: &std::path::Path,
+        message: &str,
+    ) -> Result<NewCommit, String> {
+        self.commit_with_env(message, &[], Some(working_dir))
     }
 
     pub fn stage_all_and_commit(&self, message: &str) -> Result<NewCommit, String> {
@@ -307,8 +350,9 @@ impl TestRepo {
         &self,
         message: &str,
         envs: &[(&str, &str)],
+        working_dir: Option<&std::path::Path>,
     ) -> Result<NewCommit, String> {
-        let output = self.git_with_env(&["commit", "-m", message], envs);
+        let output = self.git_with_env(&["commit", "-m", message], envs, working_dir);
 
         // println!("commit output: {:?}", output);
         if output.is_ok() {
@@ -397,6 +441,6 @@ fn compile_binary() -> PathBuf {
     binary_path
 }
 
-fn get_binary_path() -> &'static PathBuf {
+pub(crate) fn get_binary_path() -> &'static PathBuf {
     COMPILED_BINARY.get_or_init(compile_binary)
 }
