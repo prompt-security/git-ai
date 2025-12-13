@@ -623,6 +623,56 @@ fn test_diff_error_on_no_args() {
 }
 
 #[test]
+fn test_diff_json_output_with_escaped_newlines() {
+    let repo = TestRepo::new();
+
+    // Initial commit with text.split("\n")
+    let mut file = repo.filename("utils.ts");
+    file.set_contents(lines![r#"const lines = text.split("\n")"#.human()]);
+    repo.stage_all_and_commit("Initial split implementation")
+        .unwrap();
+
+    // Modify to other_text.split("\n\n")
+    file.set_contents(lines![r#"const lines = other_text.split("\n\n")"#.ai()]);
+    let commit = repo
+        .stage_all_and_commit("Update split to use double newline")
+        .unwrap();
+
+    // Run git-ai diff with --json flag
+    let output = repo
+        .git_ai(&["diff", &commit.commit_sha, "--json"])
+        .expect("git-ai diff --json should succeed");
+
+    // Parse JSON to verify it's valid
+    let json: serde_json::Value =
+        serde_json::from_str(&output).expect("Output should be valid JSON");
+
+    // Verify newlines are properly escaped in the base_content
+    let files = json.get("files").unwrap().as_object().unwrap();
+    let utils_file = files.get("utils.ts").unwrap();
+    let base_content = utils_file.get("base_content").unwrap().as_str().unwrap();
+    assert!(
+        base_content.contains(r#"text.split("\n")"#),
+        "Base content should contain properly escaped newlines: text.split(\"\\n\"), got: {}",
+        base_content
+    );
+
+    // Verify newlines are properly escaped in the diff content
+    let diff = utils_file.get("diff").unwrap().as_str().unwrap();
+    assert!(
+        diff.contains(r#"text.split("\n")"#),
+        "Diff should contain properly escaped newlines in old line: text.split(\"\\n\")"
+    );
+    assert!(
+        diff.contains(r#"other_text.split("\n\n")"#),
+        "Diff should contain properly escaped newlines in new line: other_text.split(\"\\n\\n\")"
+    );
+
+    // Print the JSON output for inspection
+    println!("JSON output:\n{}", serde_json::to_string(&json).unwrap());
+}
+
+#[test]
 fn test_diff_preserves_context_lines() {
     let repo = TestRepo::new();
 
