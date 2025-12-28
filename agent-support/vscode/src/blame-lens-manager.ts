@@ -67,6 +67,15 @@ export class BlameLensManager implements vscode.CodeLensProvider {
     'rgba(251, 146, 189, 0.8)',  // Medium Pink
   ];
 
+  /**
+   * Create a tiny SVG data URI that draws a solid stripe in the requested color.
+   * The gutter icon is reused per decoration to keep the stripe inside the gutter.
+   */
+  private createGutterIconUri(color: string): vscode.Uri {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="4" height="24"><rect width="4" height="24" fill="${color}" /></svg>`;
+    return vscode.Uri.parse(`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`);
+  }
+
   constructor(context: vscode.ExtensionContext) {
     this.context = context;
     this.blameService = new BlameService();
@@ -75,16 +84,10 @@ export class BlameLensManager implements vscode.CodeLensProvider {
     this.colorDecorations = this.HUNK_COLORS.map(color => 
       vscode.window.createTextEditorDecorationType({
         isWholeLine: true,
-        borderWidth: '0 0 0 4px',
-        borderStyle: 'solid',
-        borderColor: color,
+        gutterIconPath: this.createGutterIconUri(color),
+        gutterIconSize: 'contain',
         overviewRulerColor: color,
         overviewRulerLane: vscode.OverviewRulerLane.Left,
-        // Add left padding for better spacing
-        before: {
-          contentText: '',
-          margin: '0 8px 0 4px',
-        }
       })
     );
 
