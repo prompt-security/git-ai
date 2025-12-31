@@ -150,12 +150,24 @@ impl PromptDbRecord {
     pub fn first_message_snippet(&self, max_length: usize) -> String {
         use crate::authorship::transcript::Message;
 
+        // Truncate at a valid UTF-8 character boundary (like floor_char_boundary, but stable)
+        fn truncate_to_boundary(s: &str, max_bytes: usize) -> &str {
+            if max_bytes >= s.len() {
+                return s;
+            }
+            let mut boundary = max_bytes;
+            while !s.is_char_boundary(boundary) && boundary > 0 {
+                boundary -= 1;
+            }
+            &s[..boundary]
+        }
+
         for message in &self.messages.messages {
             if let Message::User { text, .. } = message {
                 if text.len() <= max_length {
                     return text.clone();
                 } else {
-                    return format!("{}...", &text[..max_length.min(text.len())]);
+                    return format!("{}...", truncate_to_boundary(text, max_length));
                 }
             }
         }
@@ -166,7 +178,7 @@ impl PromptDbRecord {
                 if text.len() <= max_length {
                     return text.clone();
                 } else {
-                    return format!("{}...", &text[..max_length.min(text.len())]);
+                    return format!("{}...", truncate_to_boundary(text, max_length));
                 }
             }
         }

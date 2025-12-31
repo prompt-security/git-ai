@@ -122,6 +122,16 @@ pub fn post_commit(
                 !should_exclude && (client.is_logged_in() || using_custom_api);
 
             if should_enqueue_cas {
+                // Redact secrets before uploading to CAS
+                let redaction_count =
+                    redact_secrets_from_prompts(&mut authorship_log.metadata.prompts);
+                if redaction_count > 0 {
+                    debug_log(&format!(
+                        "Redacted {} secrets from prompts before CAS upload",
+                        redaction_count
+                    ));
+                }
+
                 if let Err(e) =
                     enqueue_prompt_messages_to_cas(repo, &mut authorship_log.metadata.prompts)
                 {

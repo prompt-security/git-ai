@@ -3,7 +3,7 @@ use crate::commands::prompt_picker;
 use crate::error::GitAiError;
 use crate::git::find_repository;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -21,7 +21,6 @@ use std::io;
 enum ShareScope {
     SinglePrompt,
     AllInCommit,
-    AllInPR,
 }
 
 #[derive(Clone)]
@@ -72,12 +71,6 @@ pub fn run_tui() -> Result<(), GitAiError> {
 
         // Step 3: Create and submit bundle
         let include_all_in_commit = config.scope_selection == ShareScope::AllInCommit;
-
-        // Validate "All in PR" not implemented
-        if config.scope_selection == ShareScope::AllInPR {
-            eprintln!("Error: PR bundles are not yet implemented");
-            std::process::exit(1);
-        }
 
         let prompt_record = selected_prompt.to_prompt_record();
 
@@ -164,18 +157,18 @@ fn handle_config_key_event(
             *focused_field = if *focused_field == 0 { 1 } else { 0 };
             ConfigKeyResult::Continue
         }
-        KeyCode::Enter => {
-            // Validate and submit
-            if config.scope_selection == ShareScope::AllInPR {
-                // Show error but don't submit - handled in main loop
-            }
-            ConfigKeyResult::Submit
-        }
+        KeyCode::Enter => ConfigKeyResult::Submit,
         _ => {
             // Handle input based on focused field
             match *focused_field {
                 0 => {
                     // Title editing
+                    // Handle Ctrl+U to clear title
+                    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('u') {
+                        config.title.clear();
+                        config.title_cursor = 0;
+                        return ConfigKeyResult::Continue;
+                    }
                     match key.code {
                         KeyCode::Char(c) => {
                             config.title.insert(config.title_cursor, c);
@@ -213,13 +206,6 @@ fn handle_config_key_event(
                             config.scope_selection = match config.scope_selection {
                                 ShareScope::SinglePrompt => ShareScope::SinglePrompt,
                                 ShareScope::AllInCommit => ShareScope::SinglePrompt,
-                                ShareScope::AllInPR => {
-                                    if config.can_share_commit {
-                                        ShareScope::AllInCommit
-                                    } else {
-                                        ShareScope::SinglePrompt
-                                    }
-                                }
                             };
                         }
                         KeyCode::Down | KeyCode::Char('j') => {
@@ -228,11 +214,10 @@ fn handle_config_key_event(
                                     if config.can_share_commit {
                                         ShareScope::AllInCommit
                                     } else {
-                                        ShareScope::AllInPR
+                                        ShareScope::SinglePrompt
                                     }
                                 }
-                                ShareScope::AllInCommit => ShareScope::AllInPR,
-                                ShareScope::AllInPR => ShareScope::AllInPR,
+                                ShareScope::AllInCommit => ShareScope::AllInCommit,
                             };
                         }
                         _ => {}
@@ -246,15 +231,15 @@ fn handle_config_key_event(
 }
 
 fn render_config_screen(f: &mut Frame, config: &ShareConfig, focused_field: usize) {
-    // Layout: [Header 3] [Title 5] [Scope 12] [Footer 3]
+    // Layout: [Header 3] [Title 5] [Scope 8] [Footer 3]
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // Header
-            Constraint::Length(5),  // Title input
-            Constraint::Length(12), // Scope selection
-            Constraint::Min(0),     // Spacer
-            Constraint::Length(3),  // Footer
+            Constraint::Length(3), // Header
+            Constraint::Length(5), // Title input
+            Constraint::Length(8), // Scope selection
+            Constraint::Min(0),    // Spacer
+            Constraint::Length(3), // Footer
         ])
         .split(f.area());
 
@@ -310,7 +295,6 @@ fn render_config_screen(f: &mut Frame, config: &ShareConfig, focused_field: usiz
 
     let single_selected = config.scope_selection == ShareScope::SinglePrompt;
     let commit_selected = config.scope_selection == ShareScope::AllInCommit;
-    let pr_selected = config.scope_selection == ShareScope::AllInPR;
 
     let single_style = if single_selected {
         Style::default()
@@ -330,17 +314,8 @@ fn render_config_screen(f: &mut Frame, config: &ShareConfig, focused_field: usiz
         Style::default().fg(Color::White)
     };
 
-    let pr_style = if pr_selected {
-        Style::default()
-            .fg(Color::Red)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(Color::DarkGray)
-    };
-
     let single_marker = if single_selected { "(*)" } else { "( )" };
     let commit_marker = if commit_selected { "(*)" } else { "( )" };
-    let pr_marker = if pr_selected { "(*)" } else { "( )" };
 
     let commit_text = if !config.can_share_commit {
         format!("{} All prompts in commit (disabled - no commit)", commit_marker)
@@ -353,11 +328,6 @@ fn render_config_screen(f: &mut Frame, config: &ShareConfig, focused_field: usiz
         Line::from(Span::styled(format!("{} Only this prompt", single_marker), single_style)),
         Line::from(""),
         Line::from(Span::styled(commit_text, commit_style)),
-        Line::from(""),
-        Line::from(Span::styled(
-            format!("{} All prompts in PR (not implemented)", pr_marker),
-            pr_style,
-        )),
     ];
 
     let scope_widget = Paragraph::new(lines).block(scope_block);
@@ -365,19 +335,9 @@ fn render_config_screen(f: &mut Frame, config: &ShareConfig, focused_field: usiz
     f.render_widget(scope_widget, chunks[2]);
 
     // Footer
-    let footer_text = if config.scope_selection == ShareScope::AllInPR {
-        "PR bundles not yet implemented - press Esc to go back"
-    } else {
-        "Tab: Next field | Enter: Submit | Esc: Back"
-    };
-
-    let footer = Paragraph::new(footer_text)
+    let footer = Paragraph::new("Tab: Next field | Enter: Submit | Esc: Back | Ctrl+U: Clear title")
         .block(Block::default().borders(Borders::ALL))
-        .style(if config.scope_selection == ShareScope::AllInPR {
-            Style::default().fg(Color::Red)
-        } else {
-            Style::default().fg(Color::Cyan)
-        })
+        .style(Style::default().fg(Color::Cyan))
         .alignment(Alignment::Center);
 
     f.render_widget(footer, chunks[4]);
