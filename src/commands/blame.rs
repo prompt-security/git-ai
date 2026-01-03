@@ -129,6 +129,9 @@ pub struct GitAiBlameOptions {
 
     // JSON output format
     pub json: bool,
+
+    // Mark lines from commits without authorship logs as "Unknown"
+    pub mark_unknown: bool,
 }
 
 impl Default for GitAiBlameOptions {
@@ -170,6 +173,7 @@ impl Default for GitAiBlameOptions {
             no_output: false,
             ignore_whitespace: false,
             json: false,
+            mark_unknown: false,
         }
     }
 }
@@ -742,6 +746,7 @@ fn overlay_ai_authorship(
                         }
                         prompt_records.insert(prompt_hash, prompt_record.clone());
                     } else {
+                        // Has authorship log but line not AI = human-authored
                         if options.return_human_authors_as_human {
                             line_authors.insert(
                                 current_line_num,
@@ -752,7 +757,7 @@ fn overlay_ai_authorship(
                         }
                     }
                 } else {
-                    // Fall back to original author if no AI authorship
+                    // Has authorship log but no attribution found = human-authored
                     if options.return_human_authors_as_human {
                         line_authors
                             .insert(current_line_num, CheckpointKind::Human.to_str().to_string());
@@ -762,9 +767,12 @@ fn overlay_ai_authorship(
                 }
             }
         } else {
-            // No authorship log, use original author for all lines in hunk
+            // No authorship log for this commit
             for line_num in hunk.range.0..=hunk.range.1 {
-                if options.return_human_authors_as_human {
+                if options.mark_unknown {
+                    // User wants explicit distinction - mark as Unknown
+                    line_authors.insert(line_num, "Unknown".to_string());
+                } else if options.return_human_authors_as_human {
                     line_authors.insert(line_num, CheckpointKind::Human.to_str().to_string());
                 } else {
                     line_authors.insert(line_num, hunk.original_author.clone());
@@ -1621,6 +1629,12 @@ pub fn parse_blame_args(args: &[String]) -> Result<(String, GitAiBlameOptions), 
             // JSON output format
             "--json" => {
                 options.json = true;
+                i += 1;
+            }
+
+            // Mark unknown authorship
+            "--mark-unknown" => {
+                options.mark_unknown = true;
                 i += 1;
             }
 
