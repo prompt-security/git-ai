@@ -858,10 +858,8 @@ export class BlameLensManager {
     // Get current theme background colors
     const backgrounds = this.getThemeBackgroundColors();
     
-    // Filter colors by contrast
     this.filteredColors = this.filterColorsByContrast(this.HUNK_COLORS, backgrounds);
     
-    // Ensure we always have at least some colors (fallback to full list if filtering removes all)
     if (this.filteredColors.length === 0) {
       console.log('[git-ai] All colors filtered out by contrast check, using full palette');
       this.filteredColors = [...this.HUNK_COLORS];
