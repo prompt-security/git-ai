@@ -160,6 +160,14 @@ export class AIEditManager {
 
             console.log("[git-ai] AIEditManager: Parsed snapshot params:", params);
 
+            // "{"kind":"doc","documentId":"modified-file-entry::1","chatSessionResource":{"$mid":1,"external":"vscode-chat-session://local/MDFmNjJlNmItOTgxMi00OTY0LWI5YTYtYzRmZDBjZTE1ZmEy","path":"/MDFmNjJlNmItOTgxMi00OTY0LWI5YTYtYzRmZDBjZTE1ZmEy","scheme":"vscode-chat-session","authority":"local"}}"
+            if (!sessionId && params.chatSessionResource) {
+              // VS Code update includes the chatSessionResource object with the sessionId encoded in the path
+              console.log("[git-ai] AIEditManager: Detected chatSessionResource, attempting to parse sessionId");
+              sessionId = params.chatSessionResource.path ? Buffer.from(params.chatSessionResource.path.slice(1), 'base64').toString('utf-8') : undefined;
+              console.log("[git-ai] AIEditManager: Parsed sessionId from chatSessionResource:", sessionId);
+            }
+
             if (!sessionId && params.session && params.session.path && params.session.path.startsWith && params.session.path.startsWith('/')) {
               // VS Code update includes the sessionId encoded as Base64 
               console.log("[git-ai] AIEditManager: Detected session as object, decoding sessionId");
