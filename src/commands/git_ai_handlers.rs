@@ -72,6 +72,9 @@ pub fn handle_git_ai(args: &[String]) {
             }
             handle_stats(&args[1..]);
         }
+        "status" => {
+            commands::status::handle_status(&args[1..]);
+        }
         "show" => {
             commands::show::handle_show(&args[1..]);
         }
@@ -167,6 +170,7 @@ fn print_help() {
     eprintln!("    <commit1>..<commit2>  Diff between two commits");
     eprintln!("  stats [commit]     Show AI authorship statistics for a commit");
     eprintln!("    --json                 Output in JSON format");
+    eprintln!("  status             Show uncommitted AI authorship status (debug)");
     eprintln!("  show <rev|range>   Display authorship logs for a revision or range");
     eprintln!("  show-prompt <id>   Display a prompt record by its ID");
     eprintln!("    --commit <rev>        Look in a specific commit only");
@@ -177,7 +181,9 @@ fn print_help() {
     eprintln!("    --title <title>       Custom title for the bundle (default: auto-generated)");
     eprintln!("  sync-prompts       Update prompts in database to latest versions");
     eprintln!("    --since <time>        Only sync prompts updated after this time");
-    eprintln!("                          Formats: '1d', '2h', '1w', Unix timestamp, ISO8601, YYYY-MM-DD");
+    eprintln!(
+        "                          Formats: '1d', '2h', '1w', Unix timestamp, ISO8601, YYYY-MM-DD"
+    );
     eprintln!("    --workdir <path>      Only sync prompts from specific repository");
     eprintln!("  config             View and manage git-ai configuration");
     eprintln!("                        Show all config as formatted JSON");
