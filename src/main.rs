@@ -6,6 +6,7 @@ mod config;
 mod error;
 mod feature_flags;
 mod git;
+mod mdm;
 mod observability;
 mod utils;
 

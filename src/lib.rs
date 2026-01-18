@@ -6,5 +6,6 @@ pub mod config;
 pub mod error;
 pub mod feature_flags;
 pub mod git;
+pub mod mdm;
 pub mod observability;
 pub mod utils;
