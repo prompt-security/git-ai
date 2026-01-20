@@ -1,0 +1,23 @@
+Cargo.toml
+  8a9955de6b842b07 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.38",
+  "base_commit_sha": "6112e9cc599e182c6b3fcd351a481f85d8698111",
+  "prompts": {
+    "8a9955de6b842b07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86ddc3a1-9b09-4b30-9428-3d05f43e06a7",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Amir Barshavit <amir@prompt.security>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
