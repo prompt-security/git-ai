@@ -9,6 +9,72 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
+# Parse command line arguments
+UNINSTALL_ONLY=false
+for arg in "$@"; do
+    case $arg in
+        --uninstall)
+            UNINSTALL_ONLY=true
+            ;;
+        --help|-h)
+            echo "Usage: install.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --uninstall    Uninstall git-ai and remove all related files"
+            echo "  --help, -h     Show this help message"
+            exit 0
+            ;;
+    esac
+done
+
+# Uninstall function
+uninstall_git_ai() {
+    echo "Uninstalling git-ai..."
+
+    INSTALL_DIR="$HOME/.git-ai/bin"
+    CONFIG_DIR="$HOME/.git-ai"
+
+    # Remove binaries
+    if [ -d "$INSTALL_DIR" ]; then
+        rm -rf "$INSTALL_DIR"
+        echo "Removed $INSTALL_DIR"
+    fi
+
+    # Remove PATH entries from shell configs
+    for config_file in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.bash_profile"; do
+        if [ -f "$config_file" ]; then
+            # Remove lines containing .git-ai/bin
+            if grep -q "\.git-ai/bin" "$config_file" 2>/dev/null; then
+                sed -i.bak '/\.git-ai\/bin/d' "$config_file"
+                sed -i.bak '/# Added by git-ai installer/d' "$config_file"
+                rm -f "${config_file}.bak"
+                echo "Cleaned PATH from $config_file"
+            fi
+        fi
+    done
+
+    # Ask about config
+    if [ -d "$CONFIG_DIR" ]; then
+        echo -e "${YELLOW}Config directory exists at $CONFIG_DIR${NC}"
+        echo "Remove config directory? (y/N)"
+        read -r response
+        if [[ "$response" =~ ^[Yy]$ ]]; then
+            rm -rf "$CONFIG_DIR"
+            echo "Removed $CONFIG_DIR"
+        else
+            echo "Kept $CONFIG_DIR"
+        fi
+    fi
+
+    echo -e "${GREEN}git-ai has been uninstalled${NC}"
+}
+
+# Handle uninstall flag
+if [ "$UNINSTALL_ONLY" = true ]; then
+    uninstall_git_ai
+    exit 0
+fi
+
 # GitHub repository details
 # Replaced during release builds with the actual repository (e.g., "prompt-security/git-ai")
 # When set to __REPO_PLACEHOLDER__, defaults to "prompt-security/git-ai"
