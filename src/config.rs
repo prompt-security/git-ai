@@ -243,9 +243,10 @@ impl Config {
         &self.api_base_url
     }
 
-    /// Returns the prompt storage mode: "default", "notes", or "local"
-    /// - "default": Messages uploaded via CAS API
-    /// - "notes": Messages stored in git notes
+    /// Returns the prompt storage mode: "default", "notes", "notes-no-messages", or "local"
+    /// - "default": Messages uploaded via CAS API, stripped from notes
+    /// - "notes": Messages stored in git notes (with secret redaction)
+    /// - "notes-no-messages": Attestations and metadata stored in git notes, but messages excluded
     /// - "local": Messages only stored in sqlite (not in notes, not uploaded)
     pub fn prompt_storage(&self) -> &str {
         &self.prompt_storage
@@ -388,14 +389,14 @@ fn build_config() -> Config {
         .or_else(|| env::var("GIT_AI_API_BASE_URL").ok())
         .unwrap_or_else(|| DEFAULT_API_BASE_URL.to_string());
 
-    // Get prompt_storage setting (defaults to "default")
-    // Valid values: "default", "notes", "local"
+    // Get prompt_storage setting (defaults to "notes-no-messages")
+    // Valid values: "default", "notes", "notes-no-messages", "local"
     let prompt_storage = file_cfg
         .as_ref()
         .and_then(|c| c.prompt_storage.clone())
-        .unwrap_or_else(|| "default".to_string());
+        .unwrap_or_else(|| "notes-no-messages".to_string());
     let prompt_storage = match prompt_storage.as_str() {
-        "default" | "notes" | "local" => prompt_storage,
+        "default" | "notes" | "notes-no-messages" | "local" => prompt_storage,
         other => {
             eprintln!(
                 "Warning: Invalid prompt_storage value '{}', using 'default'",
@@ -627,7 +628,7 @@ fn apply_test_config_patch(config: &mut Config) {
             }
             if let Some(prompt_storage) = patch.prompt_storage {
                 // Validate the value
-                if matches!(prompt_storage.as_str(), "default" | "notes" | "local") {
+                if matches!(prompt_storage.as_str(), "default" | "notes" | "notes-no-messages" | "local") {
                     config.prompt_storage = prompt_storage;
                 } else {
                     eprintln!(

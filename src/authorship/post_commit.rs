@@ -108,6 +108,11 @@ pub fn post_commit(
                 }
             }
         }
+        "notes-no-messages" => {
+            // Store attestations and metadata in notes, but exclude messages
+            // Messages remain only in sqlite (similar to local, but note is still created)
+            strip_prompt_messages(&mut authorship_log.metadata.prompts);
+        }
         _ => {
             // "default" - attempt CAS upload, NEVER keep messages in notes
             // Check conditions for CAS upload:
