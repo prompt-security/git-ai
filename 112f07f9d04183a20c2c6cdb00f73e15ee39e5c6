@@ -1,0 +1,23 @@
+install.sh
+  8a9955de6b842b07 12-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.38",
+  "base_commit_sha": "112f07f9d04183a20c2c6cdb00f73e15ee39e5c6",
+  "prompts": {
+    "8a9955de6b842b07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86ddc3a1-9b09-4b30-9428-3d05f43e06a7",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Amir Barshavit <amir@prompt.security>",
+      "messages": [],
+      "total_additions": 66,
+      "total_deletions": 0,
+      "accepted_lines": 66,
+      "overriden_lines": 0
+    }
+  }
+}
