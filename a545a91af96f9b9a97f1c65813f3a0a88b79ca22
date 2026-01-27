@@ -1,0 +1,23 @@
+src/commands/git_ai_handlers.rs
+  34fe18b04e63d032 20,24,27-115,532-538,540-545,547-552,555-571,576-662,678-684,692-714,718-725,728-732,1059-1218
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.40",
+  "base_commit_sha": "a545a91af96f9b9a97f1c65813f3a0a88b79ca22",
+  "prompts": {
+    "34fe18b04e63d032": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "86f6545a-34bf-49e4-9a8e-78703dcbd9a2",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Amir Barshavit <amir@prompt.security>",
+      "messages": [],
+      "total_additions": 449,
+      "total_deletions": 83,
+      "accepted_lines": 419,
+      "overriden_lines": 0
+    }
+  }
+}
