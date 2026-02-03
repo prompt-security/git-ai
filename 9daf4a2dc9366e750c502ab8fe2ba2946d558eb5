@@ -1,0 +1,25 @@
+Cargo.toml
+  68018ba08dff0159 3
+install.sh
+  68018ba08dff0159 83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.0.42",
+  "base_commit_sha": "9daf4a2dc9366e750c502ab8fe2ba2946d558eb5",
+  "prompts": {
+    "68018ba08dff0159": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a897390b-4b54-4dec-b61a-9a66350e54ef",
+        "model": "claude-opus-4-5-20251101"
+      },
+      "human_author": "Amir Barshavit <amir@prompt.security>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
